@@ -1,1 +1,1 @@
-# Cycle Maven Plugin
+# Indoqa Cycle Maven Plugin
