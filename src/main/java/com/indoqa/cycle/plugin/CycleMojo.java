@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.indoqa.commons.process.cleaner.maven.plugin;
+package com.indoqa.cycle.plugin;
 
 import java.io.File;
 import java.io.IOException;
