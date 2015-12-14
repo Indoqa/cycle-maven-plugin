@@ -29,7 +29,14 @@
   <version>1.0.0-SNAPSHOT</version>
 
   <name>Indoqa Cycle Maven Plugin</name>
+  <url>https://github.com/Indoqa/cycle-maven-plugin</url>
   <description>Detect Package Cycles during the Maven build</description>
+
+  <scm>
+    <connection>scm:git:git@github.com:Indoqa/cycle-maven-plugin.git</connection>
+    <developerConnection>scm:git:git@github.com:Indoqa/cycle-maven-plugin.git</developerConnection>
+    <url>https://github.com/Indoqa/cycle-maven-plugin</url>
+  </scm>
 
   <properties>
     <maven-version>3.0.3</maven-version>
