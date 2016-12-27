@@ -17,20 +17,15 @@
 package com.indoqa.cycle.plugin;
 
 import java.io.File;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.project.MavenProject;
-
-import jdepend.framework.JDepend;
-import jdepend.framework.JavaPackage;
-import jdepend.framework.PackageFilter;
 
 /**
  * @goal analyze
@@ -38,12 +33,19 @@ import jdepend.framework.PackageFilter;
  */
 public class CycleMojo extends AbstractMojo {
 
+    private static final String SYSTEM_PROPERTY_SKIP = "skipCycles";
+
     private static final String[] RELEVANT_PACKAGINGS = {"jar", "war"};
 
     /**
      * @parameter property="project.build.outputDirectory"
      */
     private File classesDirectory;
+
+    /**
+     * @parameter property="project.build.directory"
+     */
+    private File targetDirectory;
 
     /**
      * @parameter property="project"
@@ -55,73 +57,97 @@ public class CycleMojo extends AbstractMojo {
      */
     private String[] excludedPackages;
 
+    private static boolean isRedundant(Cycle cycle, List<Cycle> otherCycles) {
+        for (Cycle eachOtherCycle : otherCycles) {
+            if (cycle.contains(eachOtherCycle)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static List<Cycle> removeRedundantCycles(List<Cycle> cycles) {
+        Collections.sort(cycles, Cycle.LONGEST_FIRST);
+        List<Cycle> result = new ArrayList<Cycle>();
+
+        for (int i = 0; i < cycles.size(); i++) {
+            Cycle cycle = cycles.get(i);
+            if (isRedundant(cycle, cycles.subList(i + 1, cycles.size()))) {
+                continue;
+            }
+            result.add(cycle);
+        }
+
+        return result;
+    }
+
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
+        if (System.getProperties().containsKey(SYSTEM_PROPERTY_SKIP)) {
+            this.getLog().info("Package cycle test is skipped.");
+            return;
+        }
+
         if (!this.shouldBeAnalyzed()) {
             this.getLog().info("Ignoring project with packaging '" + this.mavenProject.getPackaging() + "'");
             return;
         }
 
-        this.getLog().info("Analyzing class files in " + this.classesDirectory.getAbsolutePath());
+        this.getLog().info("Analyzing class files in '" + this.classesDirectory.getAbsolutePath() + "'.");
 
         if (!this.classesDirectory.exists()) {
             this.getLog().warn("Directory does not exist!");
             return;
         }
 
-        try {
-            Set<Cycle> cycles = this.getPackageCycles();
-            if (cycles.isEmpty()) {
-                return;
-            }
-
-            throw new MojoExecutionException(this.getFormattedCycles(cycles));
-        } catch (IOException e) {
-            throw new MojoExecutionException("Failed to detect package cycles", e);
+        List<Cycle> cycles = this.getPackageCycles();
+        if (cycles.isEmpty()) {
+            return;
         }
+
+        throw new MojoExecutionException(this.getFormattedCycles(cycles));
     }
 
-    private String getFormattedCycles(Set<Cycle> cycles) {
+    private Path getCycleFile() {
+        return this.targetDirectory.toPath().resolve("cycles.txt");
+    }
+
+    private String getFormattedCycles(List<Cycle> cycles) {
         StringBuilder stringBuilder = new StringBuilder();
 
         for (Cycle eachCycle : cycles) {
             stringBuilder.append("\n");
 
-            stringBuilder.append("Detected cycle between packages:\n");
+            stringBuilder.append("Detected package cycle:\n");
             for (String eachInvolvedPackage : eachCycle.getInvolvedPackages()) {
                 stringBuilder.append("    ");
                 stringBuilder.append(eachInvolvedPackage);
                 stringBuilder.append("\n");
             }
         }
+        stringBuilder.append("\n");
+        stringBuilder.append("See ");
+        stringBuilder.append(this.getCycleFile().toAbsolutePath());
+        stringBuilder.append(" for involved classes.");
 
         return stringBuilder.toString();
     }
 
-    @SuppressWarnings("unchecked")
-    private Set<Cycle> getPackageCycles() throws IOException {
-        Set<Cycle> result = new HashSet<Cycle>();
+    private List<Cycle> getPackageCycles() throws MojoExecutionException {
+        try {
+            CycleDetector cycleDetector = new CycleDetector(this.classesDirectory, this.excludedPackages);
 
-        JDepend depend = new JDepend();
-        depend.addDirectory(this.classesDirectory.getAbsolutePath());
-        depend.analyzeInnerClasses(true);
-
-        if (this.excludedPackages != null) {
-            depend.setFilter(new PackageFilter(Arrays.asList(this.excludedPackages)));
-        }
-
-        depend.analyze();
-
-        Collection<JavaPackage> packages = depend.getPackages();
-        for (JavaPackage eachPackage : packages) {
-            if (!eachPackage.containsCycle()) {
-                continue;
+            List<Cycle> packageCycles = cycleDetector.getPackageCycles();
+            packageCycles = removeRedundantCycles(packageCycles);
+            if (!packageCycles.isEmpty()) {
+                cycleDetector.writeCycleFile(packageCycles, this.getCycleFile());
             }
 
-            result.add(Cycle.fromPackage(eachPackage));
+            return packageCycles;
+        } catch (Exception e) {
+            throw new MojoExecutionException("Failed to detect package cycles!", e);
         }
-
-        return result;
     }
 
     private boolean shouldBeAnalyzed() {

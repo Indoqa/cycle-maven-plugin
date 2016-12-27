@@ -17,31 +17,35 @@
 package com.indoqa.cycle.plugin;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
-
-import jdepend.framework.JavaPackage;
 
 public class Cycle {
 
-    private final Set<String> involvedPackages = new TreeSet<String>();
+    public static final Comparator<? super Cycle> LONGEST_FIRST = new Comparator<Cycle>() {
 
-    public static Cycle fromPackage(JavaPackage javaPackage) {
-        Cycle cycle = new Cycle();
+        @Override
+        public int compare(Cycle c1, Cycle c2) {
+            if (c1.getLength() > c2.getLength()) {
+                return -1;
+            }
 
-        List<JavaPackage> involvedPackages = new ArrayList<JavaPackage>();
-        javaPackage.collectCycle(involvedPackages);
+            if (c1.getLength() < c2.getLength()) {
+                return 1;
+            }
 
-        for (JavaPackage eachInvolvedPackage : involvedPackages) {
-            cycle.addInvolvedPackage(eachInvolvedPackage.getName());
+            return 0;
         }
+    };
 
-        return cycle;
-    }
+    private final List<String> involvedPackages = new ArrayList<String>();
 
     public void addInvolvedPackage(String involvedPackage) {
         this.involvedPackages.add(involvedPackage);
+    }
+
+    public boolean contains(Cycle other) {
+        return this.involvedPackages.containsAll(other.involvedPackages);
     }
 
     @Override
@@ -58,12 +62,21 @@ public class Cycle {
         return this.involvedPackages.equals(other.involvedPackages);
     }
 
-    public Set<String> getInvolvedPackages() {
+    public List<String> getInvolvedPackages() {
         return this.involvedPackages;
+    }
+
+    public int getLength() {
+        return this.involvedPackages.size();
     }
 
     @Override
     public int hashCode() {
         return this.involvedPackages.hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return this.involvedPackages.toString();
     }
 }
