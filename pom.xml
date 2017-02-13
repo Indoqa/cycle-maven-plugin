@@ -23,7 +23,7 @@
   <parent>
     <groupId>com.indoqa</groupId>
     <artifactId>indoqa-oss-parent</artifactId>
-    <version>3</version>
+    <version>4</version>
   </parent>
 
   <artifactId>cycle-maven-plugin</artifactId>
