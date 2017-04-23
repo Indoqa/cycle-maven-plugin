@@ -35,7 +35,7 @@ public class CycleMojo extends AbstractMojo {
 
     private static final String SYSTEM_PROPERTY_SKIP = "skipCycles";
 
-    private static final String[] RELEVANT_PACKAGINGS = {"jar", "war"};
+    private static final String[] RELEVANT_PACKAGINGS = {"jar", "war", "bundle"};
 
     /**
      * @parameter property="project.build.outputDirectory"

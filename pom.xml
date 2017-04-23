@@ -40,8 +40,9 @@
   </scm>
 
   <properties>
+    <project.build.compiler.version>1.8</project.build.compiler.version>
+    
     <maven-version>3.0.3</maven-version>
-
     <degraph-version>0.1.4</degraph-version>
   </properties>
 
