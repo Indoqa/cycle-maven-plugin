@@ -26,7 +26,7 @@
   </parent>
 
   <artifactId>cycle-maven-plugin</artifactId>
-  <version>2.0.1</version>
+  <version>2.0.2-SNAPSHOT</version>
 
   <name>Indoqa Cycle Maven Plugin</name>
   <url>https://github.com/Indoqa/cycle-maven-plugin</url>
@@ -36,7 +36,7 @@
     <connection>scm:git:git@github.com:Indoqa/cycle-maven-plugin.git</connection>
     <developerConnection>scm:git:git@github.com:Indoqa/cycle-maven-plugin.git</developerConnection>
     <url>https://github.com/Indoqa/cycle-maven-plugin</url>
-    <tag>cycle-maven-plugin-2.0.1</tag>
+    <tag>HEAD</tag>
   </scm>
 
   <properties>
