@@ -6,3 +6,5 @@ bin
 cocoon-files
 .metadata
 .recommenders
+*.iml
+.idea
