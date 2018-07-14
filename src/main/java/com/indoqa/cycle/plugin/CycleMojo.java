@@ -25,36 +25,28 @@ import java.util.List;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugins.annotations.LifecyclePhase;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.MavenProject;
 
-/**
- * @goal analyze
- * @phase test
- */
+@Mojo(name = "analyze", defaultPhase = LifecyclePhase.TEST)
 public class CycleMojo extends AbstractMojo {
 
     private static final String SYSTEM_PROPERTY_SKIP = "skipCycles";
 
     private static final String[] RELEVANT_PACKAGINGS = {"jar", "war", "bundle"};
 
-    /**
-     * @parameter property="project.build.outputDirectory"
-     */
+    @Parameter(property = "project.build.outputDirectory")
     private File classesDirectory;
 
-    /**
-     * @parameter property="project.build.directory"
-     */
+    @Parameter(property = "project.build.directory")
     private File targetDirectory;
 
-    /**
-     * @parameter property="project"
-     */
+    @Parameter(defaultValue = "${project}", readonly = true)
     private MavenProject mavenProject;
 
-    /**
-     * @parameter property="excludedPackages"
-     */
+    @Parameter(property = "excludedPackages")
     private String[] excludedPackages;
 
     private static boolean isRedundant(Cycle cycle, List<Cycle> otherCycles) {
