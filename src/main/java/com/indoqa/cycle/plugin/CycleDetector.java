@@ -22,71 +22,27 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.util.*;
+import java.util.stream.Stream;
 
-import de.schauderhaft.degraph.check.ConstraintBuilder;
-import de.schauderhaft.degraph.check.JCheck;
-import de.schauderhaft.degraph.configuration.Configuration;
-import de.schauderhaft.degraph.java.JavaGraph;
-import de.schauderhaft.degraph.model.Node;
+import com.tngtech.archunit.core.domain.Dependency;
+import com.tngtech.archunit.core.domain.JavaClass;
+import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaPackage;
+import com.tngtech.archunit.core.importer.ClassFileImporter;
+import com.tngtech.archunit.core.importer.ImportOption.Predefined;
 
 public class CycleDetector {
 
     private static final String NEW_LINE = "\r\n";
 
-    private JavaGraph javaGraph;
+    private JavaClasses javaClasses;
+    private String[] excludedPackages;
 
     public CycleDetector(File directory, String[] excludedPackages) {
         super();
+        this.excludedPackages = excludedPackages;
 
-        this.javaGraph = createJavaGraph(directory, nullSafe(excludedPackages));
-        this.calculatePackageDependencies();
-    }
-
-    private static JavaGraph createJavaGraph(File directory, String[] excludedPackages) {
-        ConstraintBuilder constraintBuilder = JCheck.customClasspath(directory.getAbsolutePath()).noJars();
-
-        for (String eachInclude : findIncludes(directory)) {
-            constraintBuilder = constraintBuilder.including(eachInclude);
-        }
-
-        for (String eachExcludedPackage : excludedPackages) {
-            constraintBuilder = constraintBuilder.excluding(eachExcludedPackage);
-        }
-
-        Configuration configuration = constraintBuilder.configuration();
-        return new JavaGraph(configuration.createGraph());
-    }
-
-    private static List<String> findIncludes(File directory) {
-        List<String> result = new ArrayList<String>();
-
-        List<Path<File>> includes = findIncludes(new Path<File>(directory));
-        for (Path<File> eachInclude : includes) {
-            result.add(toClassName(eachInclude.subPath(1)));
-        }
-
-        return result;
-    }
-
-    private static List<Path<File>> findIncludes(Path<File> path) {
-        List<Path<File>> result = new ArrayList<Path<File>>();
-
-        File[] classFiles = path.getLastElement().listFiles(ClassFileFilter.CLASS_FILE_FILTER);
-        if (classFiles != null && classFiles.length > 0) {
-            result.add(path);
-            for (File eachClassFile : classFiles) {
-                result.add(path.createChild(eachClassFile));
-            }
-        }
-
-        File[] childDirectories = path.getLastElement().listFiles(DirectoryFilter.DIRECTORY_FILTER);
-        if (childDirectories != null && childDirectories.length > 0) {
-            for (File eachChildDirectory : childDirectories) {
-                result.addAll(findIncludes(path.createChild(eachChildDirectory)));
-            }
-        }
-
-        return result;
+        this.javaClasses = new ClassFileImporter(Arrays.asList(Predefined.DO_NOT_INCLUDE_ARCHIVES)).importPath(directory.toPath());
     }
 
     private static void indent(BufferedWriter writer, int depth) throws IOException {
@@ -95,52 +51,27 @@ public class CycleDetector {
         }
     }
 
-    private static String[] nullSafe(String[] values) {
-        if (values == null) {
-            return new String[0];
-        }
-
-        return values;
-    }
-
-    private static String removeExtention(String name, String extension) {
-        if (!name.endsWith(extension)) {
-            return name;
-        }
-
-        return name.substring(0, name.length() - extension.length());
-    }
-
-    private static String toClassName(Path<File> path) {
-        StringBuilder stringBuilder = new StringBuilder();
-
-        for (File eachElement : path) {
-            if (stringBuilder.length() > 0) {
-                stringBuilder.append('.');
-            }
-
-            stringBuilder.append(removeExtention(eachElement.getName(), ".class"));
-        }
-
-        return stringBuilder.toString();
-    }
-
-    private static Cycle toCycle(Path<Node> path) {
+    private static Cycle toCycle(Path<JavaPackage> path) {
         Cycle result = new Cycle();
 
-        for (Node eachPackageNode : path) {
-            result.addInvolvedPackage(eachPackageNode.name());
+        for (JavaPackage eachPackageNode : path) {
+            result.addInvolvedPackage(eachPackageNode.getName());
         }
 
         return result;
     }
 
     public List<Cycle> getPackageCycles() {
-        List<Cycle> result = new ArrayList<Cycle>();
+        List<Cycle> result = new ArrayList<>();
 
-        for (Node eachPackageNode : this.javaGraph.topNodes()) {
-            List<Path<Node>> dependencyChains = this.getDependencyChains(eachPackageNode);
-            for (Path<Node> eachDependencyChain : dependencyChains) {
+        Set<JavaPackage> packages = this.javaClasses.getDefaultPackage().getSubpackagesInTree();
+        for (JavaPackage eachPackage : packages) {
+            if (this.isExcluded(eachPackage)) {
+                continue;
+            }
+
+            List<Path<JavaPackage>> dependencyChains = this.getDependencyChains(eachPackage);
+            for (Path<JavaPackage> eachDependencyChain : dependencyChains) {
                 if (eachDependencyChain.containsCycle()) {
                     result.add(toCycle(eachDependencyChain));
                 }
@@ -151,128 +82,100 @@ public class CycleDetector {
     }
 
     public void writeCycleFile(List<Cycle> cycles, java.nio.file.Path targetPath) throws IOException {
-        BufferedWriter writer = Files.newBufferedWriter(targetPath, Charset.forName("UTF-8"));
+        try (BufferedWriter writer = Files.newBufferedWriter(targetPath, Charset.forName("UTF-8"))) {
+            for (Cycle eachCycle : cycles) {
+                writer.write("Cycle");
+                writer.write(NEW_LINE);
+                for (String eachPackage : eachCycle.getInvolvedPackages()) {
+                    indent(writer, 1);
+                    writer.write(eachPackage);
+                    writer.write(NEW_LINE);
+                }
 
-        for (Cycle eachCycle : cycles) {
-            writer.write("Cycle");
-            writer.write(NEW_LINE);
-            for (String eachPackage : eachCycle.getInvolvedPackages()) {
+                writer.write(NEW_LINE);
                 indent(writer, 1);
-                writer.write(eachPackage);
-                writer.write(NEW_LINE);
-            }
-
-            writer.write(NEW_LINE);
-            indent(writer, 1);
-            writer.write("Involved Classes From Each Package");
-            writer.write(NEW_LINE);
-
-            List<String> involvedPackages = eachCycle.getInvolvedPackages();
-            for (int i = 0; i < involvedPackages.size() - 1; i++) {
-                Node startPackage = this.getPackage(involvedPackages.get(i));
-                Node endPackage = this.getPackage(involvedPackages.get(i + 1));
-
-                indent(writer, 2);
-                writer.write(startPackage.name());
+                writer.write("Involved Classes From Each Package");
                 writer.write(NEW_LINE);
 
-                Set<Connection<Node>> classConnections = this.getClassConnections(startPackage, endPackage);
-                for (Connection<Node> eachClassConnection : classConnections) {
-                    indent(writer, 3);
-                    writer.write(eachClassConnection.getStart().name());
-                    writer.write(" -> ");
-                    writer.write(eachClassConnection.getEnd().name());
+                List<String> involvedPackages = eachCycle.getInvolvedPackages();
+                for (int i = 0; i < involvedPackages.size() - 1; i++) {
+                    JavaPackage startPackage = this.getPackage(involvedPackages.get(i));
+                    JavaPackage endPackage = this.getPackage(involvedPackages.get(i + 1));
+
+                    indent(writer, 2);
+                    writer.write(startPackage.getName());
+                    writer.write(NEW_LINE);
+
+                    Set<Connection<JavaClass>> classConnections = this.getClassConnections(startPackage, endPackage);
+                    for (Connection<JavaClass> eachClassConnection : classConnections) {
+                        indent(writer, 3);
+                        writer.write(eachClassConnection.getStart().getName());
+                        writer.write(" -> ");
+                        writer.write(eachClassConnection.getEnd().getName());
+                        writer.write(NEW_LINE);
+                    }
+
                     writer.write(NEW_LINE);
                 }
 
                 writer.write(NEW_LINE);
             }
-
-            writer.write(NEW_LINE);
-        }
-
-        writer.close();
-    }
-
-    private void calculatePackageDependencies() {
-        for (Node eachPackageNode : this.javaGraph.topNodes()) {
-            Set<Node> classNodes = this.javaGraph.contentsOf(eachPackageNode);
-
-            for (Node eachClassNode : classNodes) {
-                Set<Node> connectionsOf = this.javaGraph.connectionsOf(eachClassNode);
-
-                for (Node eachConnection : connectionsOf) {
-                    Node optionalPackageNode = this.getPackage(eachConnection);
-                    if (optionalPackageNode == null || optionalPackageNode.equals(eachPackageNode)) {
-                        continue;
-                    }
-
-                    this.javaGraph.connect(eachPackageNode, optionalPackageNode);
-                }
-            }
         }
     }
 
-    private Set<Connection<Node>> getClassConnections(Node startPackage, Node endPackage) {
-        Set<Connection<Node>> result = new HashSet<Connection<Node>>();
+    private Set<Connection<JavaClass>> getClassConnections(JavaPackage startPackage, JavaPackage endPackage) {
+        Set<Connection<JavaClass>> result = new HashSet<>();
 
-        Set<Node> startClasses = this.javaGraph.contentsOf(startPackage);
-        Set<Node> endClasses = this.javaGraph.contentsOf(endPackage);
+        Set<JavaClass> startClasses = startPackage.getClasses();
+        Set<JavaClass> endClasses = endPackage.getClasses();
 
-        for (Node eachStartClass : startClasses) {
-            Set<Node> connection = this.javaGraph.connectionsOf(eachStartClass);
-            for (Node eachConnection : connection) {
-                if (!endClasses.contains(eachConnection)) {
+        for (JavaClass eachStartClass : startClasses) {
+            Set<Dependency> connections = eachStartClass.getDirectDependenciesFromSelf();
+            for (Dependency eachConnection : connections) {
+                if (!endClasses.contains(eachConnection.getTargetClass())) {
                     continue;
                 }
 
-                result.add(new Connection<Node>(eachStartClass, eachConnection));
+                result.add(new Connection<>(eachStartClass, eachConnection.getTargetClass()));
             }
         }
 
         return result;
     }
 
-    private List<Path<Node>> getDependencyChains(Node packageNode) {
-        return this.getDependencyChains(new Path<Node>(packageNode));
+    private List<Path<JavaPackage>> getDependencyChains(JavaPackage packageNode) {
+        return this.getDependencyChains(new Path<>(packageNode));
     }
 
-    private List<Path<Node>> getDependencyChains(Path<Node> dependencyChain) {
+    private List<Path<JavaPackage>> getDependencyChains(Path<JavaPackage> dependencyChain) {
         if (dependencyChain.containsCycle()) {
             return Collections.singletonList(dependencyChain);
         }
 
-        Set<Node> dependencies = this.javaGraph.connectionsOf(dependencyChain.getLastElement());
+        Set<JavaPackage> dependencies = dependencyChain.getLastElement().getPackageDependenciesFromThisPackage();
         if (dependencies == null || dependencies.isEmpty()) {
             return Collections.singletonList(dependencyChain);
         }
 
-        List<Path<Node>> result = new ArrayList<Path<Node>>();
+        List<Path<JavaPackage>> result = new ArrayList<>();
 
-        for (Node eachDependency : dependencies) {
+        for (JavaPackage eachDependency : dependencies) {
             result.addAll(this.getDependencyChains(dependencyChain.createChild(eachDependency)));
         }
 
         return result;
     }
 
-    private Node getPackage(Node classNode) {
-        for (Node eachPackageNode : this.javaGraph.topNodes()) {
-            if (this.javaGraph.contentsOf(eachPackageNode).contains(classNode)) {
-                return eachPackageNode;
-            }
-        }
-
-        return null;
+    private JavaPackage getPackage(String packageName) {
+        return this.javaClasses.getPackage(packageName);
     }
 
-    private Node getPackage(String packageName) {
-        for (Node eachPackageNode : this.javaGraph.topNodes()) {
-            if (eachPackageNode.name().equals(packageName)) {
-                return eachPackageNode;
-            }
+    private boolean isExcluded(JavaPackage javaPackage) {
+        if (this.excludedPackages == null || this.excludedPackages.length == 0) {
+            return false;
         }
 
-        return null;
+        String name = javaPackage.getName();
+        return Stream.of(this.excludedPackages).anyMatch(excludedPackage -> name.equals(excludedPackage));
     }
 }

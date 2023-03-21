@@ -49,6 +49,9 @@ public class CycleMojo extends AbstractMojo {
     @Parameter(property = "excludedPackages")
     private String[] excludedPackages;
 
+    @Parameter(defaultValue = "false", property = "skip", required = false)
+    private boolean skip;
+
     private static boolean isRedundant(Cycle cycle, List<Cycle> otherCycles) {
         for (Cycle eachOtherCycle : otherCycles) {
             if (cycle.contains(eachOtherCycle)) {
@@ -61,7 +64,7 @@ public class CycleMojo extends AbstractMojo {
 
     private static List<Cycle> removeRedundantCycles(List<Cycle> cycles) {
         Collections.sort(cycles, Cycle.LONGEST_FIRST);
-        List<Cycle> result = new ArrayList<Cycle>();
+        List<Cycle> result = new ArrayList<>();
 
         for (int i = 0; i < cycles.size(); i++) {
             Cycle cycle = cycles.get(i);
@@ -76,7 +79,7 @@ public class CycleMojo extends AbstractMojo {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        if (System.getProperties().containsKey(SYSTEM_PROPERTY_SKIP)) {
+        if (this.skip || System.getProperties().containsKey(SYSTEM_PROPERTY_SKIP)) {
             this.getLog().info("Package cycle test is skipped.");
             return;
         }

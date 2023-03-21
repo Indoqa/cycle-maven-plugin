@@ -15,19 +15,18 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <packaging>maven-plugin</packaging>
 
   <parent>
     <groupId>com.indoqa</groupId>
     <artifactId>indoqa-oss-parent</artifactId>
-    <version>4</version>
+    <version>6</version>
   </parent>
 
   <artifactId>cycle-maven-plugin</artifactId>
-  <version>2.0.3-SNAPSHOT</version>
+  <version>3.0.0-SNAPSHOT</version>
 
   <name>Indoqa Cycle Maven Plugin</name>
   <url>https://github.com/Indoqa/cycle-maven-plugin</url>
@@ -41,9 +40,9 @@
   </scm>
 
   <properties>
-    <maven-version>3.5.4</maven-version>
-    <degraph-version>0.1.4</degraph-version>
-    <asm-version>6.2</asm-version>
+    <project.build.compiler.version>17</project.build.compiler.version>
+
+    <maven-version>3.8.6</maven-version>
   </properties>
 
   <dependencies>
@@ -52,43 +51,44 @@
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-plugin-api</artifactId>
       <version>${maven-version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.maven</groupId>
-      <artifactId>maven-model</artifactId>
-      <version>${maven-version}</version>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.maven</groupId>
       <artifactId>maven-core</artifactId>
       <version>${maven-version}</version>
+      <scope>provided</scope>
     </dependency>
+
     <dependency>
       <groupId>org.apache.maven.plugin-tools</groupId>
       <artifactId>maven-plugin-annotations</artifactId>
-      <version>3.5.2</version>
-      <optional>true</optional>
+      <version>3.7.1</version>
+      <scope>provided</scope>
     </dependency>
 
-    <!-- Degraph -->
     <dependency>
-      <groupId>de.schauderhaft.degraph</groupId>
-      <artifactId>degraph-check</artifactId>
-      <version>${degraph-version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.ow2.asm</groupId>
-      <artifactId>asm</artifactId>
-      <version>${asm-version}</version><!-- ASM 6.x for Java 9 compatibility -->
+      <groupId>com.tngtech.archunit</groupId>
+      <artifactId>archunit</artifactId>
+      <version>1.0.1</version>
     </dependency>
   </dependencies>
 
   <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-plugin-plugin</artifactId>
+          <version>3.7.1</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-plugin-plugin</artifactId>
-        <version>3.5.2</version>
         <executions>
           <execution>
             <id>default-descriptor</id>
@@ -101,24 +101,6 @@
             </goals>
           </execution>
         </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-javadoc-plugin</artifactId>
-        <configuration>
-          <tags>
-            <tag>
-              <name>goal</name>
-              <placement>a</placement>
-              <head>Goal:</head>
-            </tag>
-            <tag>
-              <name>phase</name>
-              <placement>a</placement>
-              <head>Phase:</head>
-            </tag>
-          </tags>
-        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.rat</groupId>
